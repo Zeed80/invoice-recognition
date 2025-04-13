@@ -1,0 +1,89 @@
+{
+  "model": {
+    "yolo_model_path": "models/yolov5s.pt",
+    "ocr_model_path": "models/ocr_model",
+    "confidence_threshold": 0.8,
+    "device": "cuda",
+    "detection_classes": [
+      "invoice_number",
+      "date",
+      "total_amount",
+      "supplier_name",
+      "inn",
+      "items_table",
+      "address",
+      "payment_info",
+      "logo"
+    ]
+  },
+  "processing": {
+    "batch_size": 1,
+    "num_workers": 4,
+    "timeout": 300,
+    "retry_count": 3,
+    "ocr_engine": "easyocr",
+    "ocr_languages": ["ru", "en"],
+    "ocr_gpu": true,
+    "post_processing": {
+      "remove_extra_spaces": true,
+      "normalize_dates": true,
+      "normalize_amounts": true
+    }
+  },
+  "storage": {
+    "input_dir": "data/input",
+    "output_dir": "data/output",
+    "temp_dir": "data/temp",
+    "max_file_size": 10485760,
+    "allowed_extensions": [".jpg", ".jpeg", ".png", ".pdf"],
+    "backup_enabled": true,
+    "backup_dir": "data/backup",
+    "backup_retention_days": 30
+  },
+  "queue": {
+    "host": "localhost",
+    "port": 5672,
+    "username": "guest",
+    "password": "guest",
+    "vhost": "/",
+    "queue_name": "invoice_processing",
+    "priority_levels": 3,
+    "max_retries": 3,
+    "retry_delay": 60
+  },
+  "monitoring": {
+    "metrics_enabled": true,
+    "metrics_port": 9090,
+    "min_f1_score": 0.9,
+    "min_precision": 0.9,
+    "min_recall": 0.9,
+    "log_level": "INFO",
+    "log_file": "logs/invoice_processing.log",
+    "log_max_size": 10485760,
+    "log_backup_count": 5
+  },
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "workers": 4,
+    "timeout": 60,
+    "cors_origins": ["*"],
+    "rate_limit": {
+      "enabled": true,
+      "requests_per_minute": 60
+    }
+  },
+  "gui": {
+    "theme": "light",
+    "window_size": {
+      "width": 1280,
+      "height": 720
+    },
+    "auto_save": true,
+    "auto_save_interval": 300,
+    "preview_size": {
+      "width": 800,
+      "height": 600
+    }
+  }
+} 
