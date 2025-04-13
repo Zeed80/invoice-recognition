@@ -4,30 +4,33 @@
 1. [Системные требования](#системные-требования)
 2. [Подготовка системы](#подготовка-системы)
 3. [Установка Python](#установка-python)
-4. [Установка CUDA](#установка-cuda)
-5. [Установка проекта](#установка-проекта)
-6. [Настройка RabbitMQ](#настройка-rabbitmq)
-7. [Настройка моделей](#настройка-моделей)
-8. [Проверка установки](#проверка-установки)
+4. [Установка проекта](#установка-проекта)
+5. [Настройка RabbitMQ](#настройка-rabbitmq)
+6. [Настройка моделей](#настройка-моделей)
+7. [Проверка установки](#проверка-установки)
+8. [Оптимизация производительности](#оптимизация-производительности)
 9. [Устранение неполадок](#устранение-неполадок)
 
 ## Системные требования
 
-### Минимальные требования
+### Минимальные требования (CPU)
 - Windows 10/11 (64-bit)
 - Intel Core i5 / AMD Ryzen 5 или выше
 - 8 ГБ оперативной памяти
-- NVIDIA GPU с 4 ГБ VRAM
 - 10 ГБ свободного места на диске
 - Права администратора
 
-### Рекомендуемые требования
+### Рекомендуемые требования (CPU)
 - Windows 10/11 Pro (64-bit)
 - Intel Core i7 / AMD Ryzen 7 или выше
 - 16 ГБ оперативной памяти
-- NVIDIA GPU с 8 ГБ VRAM
 - SSD с 20 ГБ свободного места
 - Права администратора
+
+### Рекомендуемые требования (GPU - опционально)
+- NVIDIA GPU с 4+ ГБ VRAM
+- CUDA-совместимая видеокарта
+- Дополнительно 4 ГБ оперативной памяти
 
 ## Подготовка системы
 
@@ -68,47 +71,6 @@ python --version
 pip --version
 ```
 
-## Установка CUDA
-
-1. Проверьте совместимость:
-   - Откройте PowerShell от администратора
-   - Выполните:
-```powershell
-nvidia-smi
-```
-   - Запомните версию CUDA
-
-2. Установите CUDA Toolkit:
-   - Перейдите на [NVIDIA CUDA Downloads](https://developer.nvidia.com/cuda-downloads)
-   - Выберите:
-     - Operating System: Windows
-     - Architecture: x86_64
-     - Version: 11.x (совместимую с вашей видеокартой)
-   - Скачайте и установите драйверы
-   - Скачайте и установите CUDA Toolkit
-
-3. Установите cuDNN:
-   - Зарегистрируйтесь на [NVIDIA Developer](https://developer.nvidia.com/)
-   - Скачайте cuDNN для вашей версии CUDA
-   - Распакуйте архив
-   - Скопируйте файлы в папку CUDA:
-```powershell
-xcopy cuda\bin\* "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.x\bin"
-xcopy cuda\include\* "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.x\include"
-xcopy cuda\lib\x64\* "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.x\lib\x64"
-```
-
-4. Настройте переменные среды:
-   - Нажмите Win + R
-   - Введите `sysdm.cpl`
-   - Перейдите на вкладку "Дополнительно"
-   - Нажмите "Переменные среды"
-   - В системных переменных добавьте в PATH:
-```
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.x\bin
-C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.x\libnvvp
-```
-
 ## Установка проекта
 
 1. Клонируйте репозиторий:
@@ -129,8 +91,15 @@ python -m pip install --upgrade pip
 ```
 
 4. Установите зависимости:
+
+Для CPU:
 ```powershell
-pip install -r requirements.txt
+pip install -r requirements.cpu.txt
+```
+
+Для GPU (опционально):
+```powershell
+pip install -r requirements.gpu.txt
 ```
 
 5. Создайте директории:
@@ -180,81 +149,149 @@ curl.exe -L "https://github.com/ultralytics/yolov5/releases/download/v6.1/yolov5
 python -c "import easyocr; reader = easyocr.Reader(['ru', 'en'])"
 ```
 
+3. Настройте конфигурацию:
+```powershell
+copy config\default.json config\local.json
+```
+
+4. Отредактируйте `config\local.json`:
+
+Для CPU:
+```json
+{
+  "model": {
+    "device": "cpu",
+    "batch_size": 1
+  }
+}
+```
+
+Для GPU (если установлен):
+```json
+{
+  "model": {
+    "device": "cuda",
+    "batch_size": 4
+  }
+}
+```
+
 ## Проверка установки
 
-1. Проверьте CUDA:
+1. Проверьте конфигурацию:
 ```powershell
-python -c "import torch; print(torch.cuda.is_available())"
+python scripts\check_config.py
 ```
 
 2. Проверьте RabbitMQ:
    - Откройте http://localhost:15672
    - Войдите как admin/password
 
-3. Проверьте конфигурацию:
-```powershell
-copy config\default.json config\local.json
-python scripts\check_config.py
-```
-
-4. Запустите тесты:
+3. Запустите тесты:
 ```powershell
 pytest tests
 ```
 
+## Оптимизация производительности
+
+### Для CPU
+
+1. Оптимизация параметров:
+   - Установите в `config\local.json`:
+```json
+{
+  "model": {
+    "device": "cpu",
+    "batch_size": 1,
+    "num_workers": 1,
+    "use_mkldnn": true
+  },
+  "processing": {
+    "max_concurrent_tasks": 2,
+    "timeout": 600
+  }
+}
+```
+
+2. Настройка приоритетов процесса:
+```powershell
+# Запуск с высоким приоритетом
+Start-Process python -ArgumentList "src/worker/main.py" -WindowStyle Normal -Priority High
+```
+
+3. Закройте ресурсоемкие приложения
+
+### Для GPU (если установлен)
+
+1. Оптимизация параметров:
+   - Установите в `config\local.json`:
+```json
+{
+  "model": {
+    "device": "cuda",
+    "batch_size": 4,
+    "num_workers": 2,
+    "use_amp": true
+  },
+  "processing": {
+    "max_concurrent_tasks": 4,
+    "timeout": 300
+  }
+}
+```
+
 ## Устранение неполадок
 
-### CUDA не работает
-1. Проверьте драйверы:
-```powershell
-nvidia-smi
-```
-2. Проверьте переменные среды:
-```powershell
-echo $env:PATH
-```
-3. Переустановите PyTorch с CUDA:
-```powershell
-pip uninstall torch torchvision
-pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu11x
-```
-
-### RabbitMQ не запускается
-1. Проверьте службу:
-```powershell
-Get-Service RabbitMQ
-```
-2. Проверьте логи:
-```powershell
-type "$env:APPDATA\RabbitMQ\log\rabbit@localhost.log"
-```
-3. Переустановите RabbitMQ:
-```powershell
-net stop RabbitMQ
-"C:\Program Files\RabbitMQ Server\rabbitmq_server-3.x.x\sbin\rabbitmq-service.bat" remove
-"C:\Program Files\RabbitMQ Server\rabbitmq_server-3.x.x\sbin\rabbitmq-service.bat" install
-net start RabbitMQ
-```
-
-### Проблемы с Python
+### Общие проблемы
 1. Проверьте виртуальное окружение:
 ```powershell
 .\venv\Scripts\activate
 python -c "import sys; print(sys.prefix)"
 ```
+
 2. Пересоздайте окружение:
 ```powershell
 deactivate
 Remove-Item -Recurse -Force venv
 python -m venv venv
 .\venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.cpu.txt  # или requirements.gpu.txt
+```
+
+### Проблемы производительности CPU
+1. Проверьте загрузку CPU:
+```powershell
+Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 10
+```
+
+2. Оптимизация:
+   - Уменьшите `batch_size` до 1
+   - Уменьшите `num_workers` до 1
+   - Включите `use_mkldnn` в конфигурации
+   - Закройте фоновые процессы
+
+### RabbitMQ не запускается
+1. Проверьте службу:
+```powershell
+Get-Service RabbitMQ
+```
+
+2. Проверьте логи:
+```powershell
+type "$env:APPDATA\RabbitMQ\log\rabbit@localhost.log"
 ```
 
 ### Недостаточно памяти
-1. Закройте ненужные программы
-2. Уменьшите параметры в `config\local.json`:
-   - `batch_size`: 1
-   - `num_workers`: 2
-3. Отключите фоновые процессы Windows
-4. Увеличьте файл подкачки 
+1. Проверьте использование памяти:
+```powershell
+Get-Process python | Select-Object WorkingSet, PM, CPU
+```
+
+2. Оптимизация:
+   - Уменьшите `batch_size`
+   - Уменьшите количество workers
+   - Увеличьте файл подкачки
+   - Очистите временные файлы:
+```powershell
+Remove-Item -Path "data\temp\*" -Recurse -Force
+```
